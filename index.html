@@ -86,15 +86,15 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:6px;bord
 
 <main>
 <h1>🎄 Posada Navideña 🎄</h1>
-<p class="sub">Intercambio de regalos entre amigos</p>
+<p class="sub">Fecha y hora de la posada</p>
 
 <section id="v-home" class="card">
-  <h2>💌 Escribe tu carta</h2>
-  <p class="note">🎁 Pide <b>un solo regalo</b>. Recuerda que el límite es de <b>$100 a $150 pesos</b>. Solo puedes enviar una carta, y para ver las demás primero debes enviar la tuya.</p>
+  <h2>Escribe tu carta</h2>
+  <p class="note">🎁 Pide <b>un solo regalo</b>, recuerda que el límite es de <b>$100 a $150 pesos</b>. Solo puedes enviar una carta, y para ver las demás primero debes enviar la tuya.</p>
   <label for="name">Tu nombre</label>
-  <input id="name" maxlength="30" placeholder="Ej. Ana López" autocomplete="off">
+  <input id="name" maxlength="30" placeholder="Ej. Alejandro Avila" autocomplete="off">
   <label for="wish">Tu wishlist (un regalo)</label>
-  <textarea id="wish" maxlength="200" placeholder="Ej. Una taza grande para el café"></textarea>
+  <textarea id="wish" maxlength="200" placeholder="Ej. El GTA 6 version temu porque no hay presupuesto"></textarea>
   <p id="m1" class="err"></p>
   <button id="reg" class="btn" disabled>Enviar mi carta 💌</button>
   <hr>
@@ -119,13 +119,14 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:6px;bord
 </section>
 
 <section id="v-admin" hidden class="card">
-  <div class="top"><h2>🎅 Panel del organizador</h2><button class="mini" id="aout">Salir</button></div>
+  <div class="top"><h2>Panel del organizador</h2><button class="mini" id="aout">Salir</button></div>
   <label for="adate">Fecha y hora en que se abre la elección</label>
   <input type="datetime-local" id="adate">
   <button class="btn alt" id="adsave">Guardar fecha</button> <span id="amsg" class="err ok"></span>
   <h3>Participantes</h3>
   <div class="scroll"><table id="atable"></table></div>
   <p class="note">«Deshacer» libera la elección de esa persona para que pueda escoger otra carta (útil si al último solo le queda su propia carta).</p>
+  <p class="note">Si algo no le entiendes ni le muevas y mandame mensaje, gracias dios te bendiga ser de luz que este viendo esto, VIVA ALE Y SU CASA</p>
 </section>
 </main>
 
@@ -206,14 +207,14 @@ function playEnvelope(code){
   $('modal').hidden=false;
   $('mbody').innerHTML='<div class="anim"><div class="back"></div><div class="paper"></div><div class="front"></div><div class="flap"></div><div class="seal"></div></div><p><b>Guardando tu carta…</b></p>';
   setTimeout(()=>{
-    $('mbody').innerHTML=`<h2>¡Carta guardada! 💌</h2><p>Este es tu código secreto:</p><div class="code">${code}</div><p>Anótalo o toma captura: lo necesitas para entrar, editar tu wishlist y ver las demás cartas.</p><button class="btn" id="enter">Entrar</button>`;
+    $('mbody').innerHTML=`<h2>¡Carta guardada! </h2><p>Este es tu código secreto:</p><div class="code">${code}</div><p>Anótalo o toma captura: lo necesitas para entrar, editar tu wishlist y ver las demás cartas.</p><button class="btn" id="enter">Entrar</button>`;
     $('enter').onclick=()=>{$('modal').hidden=true;$('reg').disabled=false;$('name').value=$('wish').value='';login(code)};
   },4200);
 }
 
 /* ---- Panel del participante ---- */
 function buildMe(){
-  $('hi').textContent=`Hola, ${me.name} 🎅`;$('mycode').textContent=me.code;
+  $('hi').textContent=`Holaaa, ${me.name} 🎅`;$('mycode').textContent=me.code;
   $('ewish').value=me.wish;$('emsg').textContent='';updateMe();
 }
 function updateMe(){
@@ -253,17 +254,17 @@ function renderBoard(){
   let h;
   if(me.picked&&get(me.picked)){
     const t=get(me.picked);
-    h=`<div class="letter"><h2>🎁 Te tocó regalarle a</h2><div class="who">${esc(t.name)}</div><p class="w">${esc(t.wish)}</p><small>Recuerda: entre $100 y $150 pesos. ¡Es un secreto! 🤫</small></div>`;
+    h=`<div class="letter"><h2>🎁 Te tocó regalarle a</h2><div class="who">${esc(t.name)}</div><p class="w">${esc(t.wish)}</p><small>Recuerda: entre $100 y $150 pesos, es un SECRETO, chiston o te sacamos del grupo</small></div>`;
   }else if(!open){
     h=`<h2>📮 Cartas registradas: ${all.length}</h2><p>Aquí están las cartas de tus amigos, cerradas. Cuando abra la elección podrás escoger una.</p><div class="grid">${all.map(p=>`<div class="env${p.id===me.id?' mine':''}">${p.id===me.id?'<span>Tuya</span>':''}</div>`).join('')}</div>`;
   }else{
     const av=all.filter(p=>p.id!==me.id&&!p.chosenBy).map(p=>p.id);
     order=order.filter(i=>av.includes(i));
     av.filter(i=>!order.includes(i)).forEach(i=>order.splice(Math.floor(Math.random()*(order.length+1)),0,i));
-    if(!order.length)h='<h2>📭 No quedan cartas disponibles</h2><p>Si solo te quedó tu propia carta, avisa al organizador para que te deje escoger otra vez.</p>';
+    if(!order.length)h='<h2>📭 No quedan cartas disponibles</h2><p>Si solo te quedó tu propia carta, avisale al Ale desde su phone number para que te deje escoger otra vez.</p>';
     else{
       const idx=order.map((_,k)=>k),half=Array.from({length:Math.ceil(12/idx.length)},()=>idx).flat(),cards=half.concat(half).map(k=>`<button class="env pick" data-i="${k}" aria-label="Carta misteriosa"></button>`).join('');
-      h=`<h2>🎅 ¡Escoge tu carta!</h2><p>Quedan ${order.length} cartas. Pasa el cursor para detenerlas y haz clic en la que quieras. <b>No podrás cambiarla después.</b></p><div class="track"><div class="row" style="animation-duration:${half.length*3}s">${cards}</div></div>`;
+      h=`<h2>¡Escoge tu carta!</h2><p>Quedan ${order.length} cartas. Pasa el cursor para detenerlas y haz clic en la que quieras. <b>No podrás cambiarla después, escoge bien</b></p><div class="track"><div class="row" style="animation-duration:${half.length*3}s">${cards}</div></div>`;
     }
   }
   if(b._h!==h){b._h=h;b.innerHTML=h}
@@ -271,7 +272,7 @@ function renderBoard(){
 $('board').onclick=async e=>{
   const c=e.target.closest('.pick');if(!c||me.picked)return;
   const id=order[+c.dataset.i];
-  if(!confirm('¿Quieres esta carta? Una vez elegida NO podrás cambiarla.'))return;
+  if(!confirm('¿Quieres esta carta? Una vez elegida NO podrás cambiarla, pero seguro?'))return;
   try{
     await runTransaction(db,async t=>{
       const a=doc(db,'participants',me.id),r=doc(db,'participants',id);
@@ -280,7 +281,7 @@ $('board').onclick=async e=>{
       if(sr.data().chosenBy)throw 'TOMADA';
       t.update(a,{picked:id});t.update(r,{chosenBy:me.id});
     });
-  }catch(x){alert(x==='TOMADA'?'Alguien acaba de elegir esa carta. Escoge otra.':x==='YA'?'Ya elegiste una carta.':'No se pudo guardar tu elección. Inténtalo de nuevo.')}
+  }catch(x){alert(x==='TOMADA'?'Yyyy te la ganaron, escoge otra.':x==='YA'?'Ya elegiste una carta.':'No se pudo guardar tu elección. Inténtalo de nuevo.')}
 };
 
 /* ---- Administrador ---- */
