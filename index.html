@@ -60,6 +60,17 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:6px;bord
 @keyframes fl{0%{transform:rotateX(180deg);z-index:0}49%{z-index:0}50%{z-index:3}100%{transform:rotateX(0);z-index:3}}
 @keyframes pop{to{transform:scale(1)}}
 @keyframes save{to{transform:translateY(130px) scale(.3);opacity:0}}
+.msgs{height:260px;overflow-y:auto;background:#f6efdc;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.m{max-width:80%;padding:7px 11px;border-radius:14px;overflow-wrap:anywhere}.m small{display:block;font-size:.7rem;opacity:.7}
+.m.me{align-self:flex-end;background:var(--green);color:#fff;border-bottom-right-radius:4px}
+.m.them{align-self:flex-start;background:#fff;border:1px solid #d8c9a3;border-bottom-left-radius:4px}
+.send{display:flex;gap:8px;margin-top:10px}.send .btn{margin:0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:11;background:var(--red);color:#fff;padding:10px 18px;border-radius:999px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.4);max-width:92vw}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.tab{flex:1;min-width:140px;padding:10px 12px;border:2px solid #d8c9a3;border-radius:12px;background:#fff;color:var(--ink);font:700 .95rem inherit;font-family:inherit;cursor:pointer}
+.tab.santa.on{background:var(--red);border-color:var(--red);color:#fff}.tab.receiver.on{background:var(--green);border-color:var(--green);color:#fff}
+.dot{background:var(--gold);color:var(--ink);border-radius:999px;padding:0 8px;margin-left:6px}
+.note.santa{border-left-color:var(--red);background:#fdecea}.msgs.santa .m.me{background:var(--red)}
 /* decoración */
 .lights{position:fixed;top:0;left:0;right:0;height:30px;z-index:3;display:flex;justify-content:space-around;pointer-events:none;border-top:3px solid #222}
 .lights i{width:11px;height:16px;margin-top:3px;border-radius:50%;background:var(--c);box-shadow:0 0 10px 3px var(--c);animation:bl 1.4s infinite alternate}
@@ -109,12 +120,14 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:6px;bord
   <div class="card">
     <div class="top"><h2 id="hi"></h2><div>Tu código: <span class="chip" id="mycode"></span> <button class="mini" id="out">Salir</button></div></div>
     <p id="cd" class="cd"></p>
+    <button class="mini" id="bell" hidden>🔔 Activar avisos de mensajes</button>
     <details open><summary>✏️ Mi wishlist</summary>
       <textarea id="ewish" maxlength="200"></textarea>
       <p id="elock" class="note"></p>
       <button id="esave" class="btn alt">Guardar cambios</button> <span id="emsg" class="err"></span>
     </details>
   </div>
+  <div id="chats"></div>
   <div class="card" id="board"></div>
 </section>
 
@@ -130,21 +143,22 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:6px;bord
 </section>
 </main>
 
+<div id="toast" hidden></div>
 <div id="modal" hidden><div class="mb" id="mbody"></div></div>
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,collection,doc,onSnapshot,runTransaction,setDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,collection,doc,onSnapshot,runTransaction,setDoc,query,orderBy,addDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ====== CONFIGURA AQUÍ ====== */
-  const firebaseConfig = {
-    apiKey: "AIzaSyAerDDxfPVE_QX8DYA6VFLXQYalb3A69ZA",
-    authDomain: "posada-11b54.firebaseapp.com",
-    projectId: "posada-11b54",
-    storageBucket: "posada-11b54.firebasestorage.app",
-    messagingSenderId: "1079918941169",
-    appId: "1:1079918941169:web:d6a48eed9b556399ff6a50"
-  };
+const firebaseConfig={
+  apiKey:"AIzaSyAerDDxfPVE_QX8DYA6VFLXQYalb3A69ZA",
+  authDomain:"posada-11b54.firebaseapp.com",
+  projectId:"posada-11b54",
+  storageBucket:"posada-11b54.firebasestorage.app",
+  messagingSenderId:"1079918941169",
+  appId:"1:1079918941169:web:d6a48eed9b556399ff6a50"
+};
 const ADMIN_CODE="POSADA"; // cámbialo: es tu código de organizador
 /* ============================ */
 
@@ -152,6 +166,7 @@ const db=getFirestore(initializeApp(firebaseConfig));
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+let unsubs={},chats={},flip=0;
 let all=[],cfg={},me=null,isAdmin=false,ready=false,tried=false,order=[],wasOpen=false;
 const get=id=>all.find(p=>p.id===id);
 const isOpen=()=>!!cfg.date&&Date.now()>=cfg.date;
@@ -167,7 +182,7 @@ function sync(){
   if(!ready)return;
   $('reg').disabled=false;
   if(!tried){tried=true;const c=ls('posada_code');if(c&&login(c))return}
-  if(me){me=get(me.id);if(!me){logout();return}updateMe();renderBoard()}
+  if(me){me=get(me.id);if(!me){logout();return}updateMe();renderBoard();subChats();renderChats()}
   else if(isAdmin)renderAdmin();
 }
 
@@ -176,9 +191,9 @@ function login(code){
   if(code.toUpperCase()===ADMIN_CODE.toUpperCase()){isAdmin=true;ls('posada_code',code);go('admin');renderAdmin();return true}
   const p=all.find(x=>x.code===code);
   if(!p)return false;
-  me=p;isAdmin=false;ls('posada_code',code);go('dash');buildMe();renderBoard();return true
+  me=p;isAdmin=false;ls('posada_code',code);go('dash');buildMe();renderBoard();subChats();renderChats();return true
 }
-function logout(){me=null;isAdmin=false;ls('posada_code',null);go('home')}
+function logout(){Object.values(unsubs).forEach(u=>u());unsubs={};chats={};$('chats').innerHTML='';me=null;isAdmin=false;ls('posada_code',null);go('home')}
 $('out').onclick=$('aout').onclick=logout;
 $('log').onclick=()=>{if(!login($('code').value))$('m2').textContent='Ese código no existe. Revísalo o pídeselo al organizador.'};
 $('code').onkeydown=e=>{if(e.key==='Enter')$('log').click()};
@@ -283,6 +298,79 @@ $('board').onclick=async e=>{
     });
   }catch(x){alert(x==='TOMADA'?'Yyyy te la ganaron, escoge otra.':x==='YA'?'Ya elegiste una carta.':'No se pudo guardar tu elección. Inténtalo de nuevo.')}
 };
+
+/* ---- Chat Secret Santa (bandeja única) ---- */
+let active='';
+const bell=$('bell');
+if('Notification' in window&&Notification.permission==='default')bell.hidden=false;
+bell.onclick=async()=>{await Notification.requestPermission();bell.hidden=true};
+const chatList=()=>{
+  const l=[],t=me.picked&&get(me.picked);
+  if(t)l.push({role:'santa',id:t.id,sid:me.id,other:t.name,tab:`🎁 ${t.name}`,ph:`Mensaje para ${t.name}…`,hint:`Estás escribiendo a ${t.name}, la persona a quien tú le regalas. No sabe que eres tú 🤫`});
+  if(me.chosenBy)l.push({role:'receiver',id:me.id,sid:me.chosenBy,other:'Tu Secret Santa',tab:'🎅 Mi Secret Santa',ph:'Mensaje para tu Secret Santa…',hint:'Estás escribiendo a tu Secret Santa, la persona que te regala a ti. Tú no sabes quién es 🤫'});
+  l.forEach(c=>c.k=c.role+'|'+c.id+'|'+c.sid);return l;
+};
+const rk=c=>'posada_r_'+c.k;
+const mine=c=>((chats[c.k]||{}).msgs||[]).filter(m=>m.sid===c.sid);
+const unreadOf=c=>mine(c).filter(m=>m.from!==c.role&&m.at>(+ls(rk(c))||0)).length;
+const total=()=>me?chatList().reduce((n,c)=>n+unreadOf(c),0):0;
+function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,5000)}
+function beep(){try{const a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;g.gain.setValueAtTime(.15,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.4);o.start();o.stop(a.currentTime+.4)}catch(e){}}
+function markRead(){
+  if(!me||document.hidden||!document.hasFocus())return;
+  const c=chatList().find(x=>x.role===active),m=c?mine(c):[];
+  if(m.length)ls(rk(c),String(Math.max(...m.map(x=>x.at))));
+}
+function subChats(){
+  const need=chatList(),keys=need.map(c=>c.k);
+  Object.keys(unsubs).filter(k=>!keys.includes(k)).forEach(k=>{unsubs[k]();delete unsubs[k];delete chats[k]});
+  need.forEach(c=>{
+    if(unsubs[c.k])return;
+    unsubs[c.k]=onSnapshot(query(collection(db,'chats',c.id,'msgs'),orderBy('at')),s=>{
+      const first=!chats[c.k];
+      const added=first?[]:s.docChanges().filter(x=>x.type==='added').map(x=>x.doc.data()).filter(x=>x.sid===c.sid&&x.from!==c.role);
+      chats[c.k]={msgs:s.docs.map(d=>d.data())};
+      const away=document.hidden||!document.hasFocus();
+      if(first){const u=unreadOf(c);if(u)toast(`💬 Tienes ${u} mensaje${u>1?'s':''} nuevo${u>1?'s':''} (${c.tab})`)}
+      else if(added.length){
+        const t=added[added.length-1];beep();
+        if(away||c.role!==active)toast(`💬 ${c.other}: ${t.text.slice(0,60)}`);
+        if(away&&window.Notification&&Notification.permission==='granted')new Notification('🎄 Posada: mensaje de '+c.other,{body:t.text,tag:'posada-'+c.role});
+      }
+      renderChats();
+    },fail);
+  });
+}
+function renderChats(){
+  if(!me)return;
+  const box=$('chats'),list=chatList();
+  if(!list.length){box.innerHTML='';return}
+  if(!list.find(c=>c.role===active))active=list[0].role;
+  markRead();
+  const c=list.find(x=>x.role===active);
+  let t=$('tray');
+  if(!t){
+    box.innerHTML='<div class="card" id="tray"><h2>📬 Mis mensajes</h2><div class="tabs"></div><p class="note"></p><div class="msgs"></div><div class="send"><input maxlength="300"><button class="btn">Enviar</button></div></div>';
+    t=$('tray');
+    const inp=t.querySelector('input'),send=async()=>{
+      const c=chatList().find(x=>x.role===active),text=inp.value.trim();
+      if(!c||!text)return;inp.value='';
+      try{await addDoc(collection(db,'chats',c.id,'msgs'),{from:c.role,sid:c.sid,text,at:Date.now()})}
+      catch(e){inp.value=text;toast('No se pudo enviar. Inténtalo de nuevo.')}
+    };
+    t.querySelector('button').onclick=send;inp.onkeydown=e=>{if(e.key==='Enter')send()};
+    t.querySelector('.tabs').onclick=e=>{const x=e.target.closest('[data-r]');if(!x||x.dataset.r===active)return;active=x.dataset.r;inp.value='';renderChats()};
+  }
+  t.querySelector('.tabs').innerHTML=list.map(x=>{const u=unreadOf(x);return `<button class="tab ${x.role}${x.role===active?' on':''}" data-r="${x.role}">${esc(x.tab)}${u?`<span class="dot">${u}</span>`:''}</button>`}).join('');
+  const n=t.querySelector('.note'),ms=t.querySelector('.msgs'),inp=t.querySelector('input'),m=mine(c);
+  n.className='note '+c.role;n.textContent=c.hint;inp.placeholder=c.ph;
+  t.querySelector('button.btn').className='btn '+(c.role==='santa'?'':'alt');
+  ms.className='msgs '+c.role;
+  const h=m.length?m.map(x=>`<div class="m ${x.from===c.role?'me':'them'}"><small>${x.from===c.role?'Tú':esc(c.other)} · ${new Date(x.at).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small>${esc(x.text)}</div>`).join(''):'<p style="margin:auto;opacity:.6">Aún no hay mensajes. ¡Rompe el hielo! ❄️</p>';
+  const k=c.k+h;if(ms._h!==k){ms._h=k;ms.innerHTML=h;ms.scrollTop=ms.scrollHeight}
+}
+setInterval(()=>{const n=total();flip^=1;document.title=n?(document.hidden&&flip?'💬 ¡Mensaje nuevo!':`(${n}) Posada Navideña 🎄`):'Posada Navideña 🎄'},1000);
+addEventListener('focus',renderChats);document.addEventListener('visibilitychange',renderChats);
 
 /* ---- Administrador ---- */
 const toLocal=ms=>new Date(ms-new Date(ms).getTimezoneOffset()*6e4).toISOString().slice(0,16);
